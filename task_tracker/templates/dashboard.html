@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Task Tracker{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Analytics Dashboard</h2>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <h3 class="display-4">{{ stats.total }}</h3>
+                <p class="mb-0">Total Tasks</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <h3 class="display-4">{{ stats.completed }}</h3>
+                <p class="mb-0">Completed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <h3 class="display-4">{{ stats.pending }}</h3>
+                <p class="mb-0">Pending</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <h3 class="display-4">{{ stats.completion_rate }}%</h3>
+                <p class="mb-0">Completion Rate</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Productivity Insights -->
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">🧠 Productivity Insights</h5>
+    </div>
+    <div class="card-body">
+        <ul id="insights-list" class="list-unstyled mb-0">
+            <li class="mb-2">📊 Loading insights...</li>
+        </ul>
+    </div>
+</div>
+
+<!-- Charts Row 1 -->
+<div class="row mb-4">
+    <div class="col-lg-8 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📈 Weekly Task Completion</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="weeklyChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">🎯 Platform Distribution</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="platformChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 2 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">📅 Daily Productivity (Last 30 Days)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="dailyChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Platform Stats -->
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">🐙 GitHub Stats</h5>
+            </div>
+            <div class="card-body">
+                {% if platform_data.github %}
+                    <div class="mb-3">
+                        <strong>Username:</strong> {{ platform_data.github.username }}<br>
+                        <strong>Public Repos:</strong> {{ platform_data.github.public_repos }}<br>
+                        <strong>Followers:</strong> {{ platform_data.github.followers }}<br>
+                        <strong>Total Stars:</strong> {{ platform_data.github.total_stars }}<br>
+                        <strong>Recent Commits:</strong> {{ platform_data.github.recent_commits }}
+                    </div>
+                    <small class="text-muted">Last updated: {{ platform_data.github.last_updated }}</small>
+                {% else %}
+                    <p class="text-muted">No GitHub data synced yet.</p>
+                {% endif %}
+                <hr>
+                <form id="github-sync-form" class="mt-3">
+                    <div class="input-group">
+                        <input type="text" name="username" class="form-control" placeholder="GitHub username" required>
+                        <button type="submit" class="btn btn-primary">Sync</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">💻 LeetCode Stats</h5>
+            </div>
+            <div class="card-body">
+                {% if platform_data.leetcode %}
+                    <div class="mb-3">
+                        <strong>Username:</strong> {{ platform_data.leetcode.username }}<br>
+                        <strong>Ranking:</strong> {{ platform_data.leetcode.ranking }}<br>
+                        <strong>Total Solved:</strong> {{ platform_data.leetcode.problems_solved.total }}<br>
+                        <strong>Easy:</strong> {{ platform_data.leetcode.problems_solved.easy }} | 
+                        <strong>Medium:</strong> {{ platform_data.leetcode.problems_solved.medium }} | 
+                        <strong>Hard:</strong> {{ platform_data.leetcode.problems_solved.hard }}
+                    </div>
+                    <small class="text-muted">Last updated: {{ platform_data.leetcode.last_updated }}</small>
+                {% else %}
+                    <p class="text-muted">No LeetCode data synced yet.</p>
+                {% endif %}
+                <hr>
+                <form id="leetcode-sync-form" class="mt-3">
+                    <div class="input-group">
+                        <input type="text" name="username" class="form-control" placeholder="LeetCode username" required>
+                        <button type="submit" class="btn btn-warning">Sync</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Fetch chart data and render charts
+    fetch('/dashboard/api/chart-data')
+        .then(response => response.json())
+        .then(data => {
+            // Render insights
+            const insightsList = document.getElementById('insights-list');
+            insightsList.innerHTML = '';
+            data.insights.forEach(insight => {
+                const li = document.createElement('li');
+                li.className = 'mb-2';
+                li.innerHTML = `✨ ${insight}`;
+                insightsList.appendChild(li);
+            });
+            
+            // Weekly Completion Chart (Bar Chart)
+            const weeklyCtx = document.getElementById('weeklyChart').getContext('2d');
+            new Chart(weeklyCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.weekly.labels,
+                    datasets: [{
+                        label: 'Tasks Completed',
+                        data: data.weekly.data,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Platform Distribution Chart (Pie Chart)
+            const platformCtx = document.getElementById('platformChart').getContext('2d');
+            new Chart(platformCtx, {
+                type: 'pie',
+                data: {
+                    labels: data.platform.labels,
+                    datasets: [{
+                        data: data.platform.data,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(255, 206, 86, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(153, 102, 255, 0.6)',
+                            'rgba(255, 159, 64, 0.6)',
+                            'rgba(199, 199, 199, 0.6)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true
+                }
+            });
+            
+            // Daily Productivity Chart (Line Chart)
+            const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+            new Chart(dailyCtx, {
+                type: 'line',
+                data: {
+                    labels: data.daily.labels,
+                    datasets: [{
+                        label: 'Tasks Completed',
+                        data: data.daily.data,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(error => console.error('Error loading chart data:', error));
+    
+    // GitHub sync
+    document.getElementById('github-sync-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const username = this.querySelector('input[name="username"]').value;
+        
+        fetch(`/api/sync/github?username=${username}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('GitHub data synced successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to sync GitHub data');
+        });
+    });
+    
+    // LeetCode sync
+    document.getElementById('leetcode-sync-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const username = this.querySelector('input[name="username"]').value;
+        
+        fetch(`/api/sync/leetcode?username=${username}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('LeetCode data synced successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to sync LeetCode data');
+        });
+    });
+</script>
+{% endblock %}
